@@ -1,0 +1,35 @@
+{
+  "data": {
+    "skip_preprocess": true,
+    "train_input_dir": "./data/PL_unwrap_orig",
+    "train_target_dir": "./data/PL_wrap_orig",
+    "val_input_dir": "./data/PL_unwrap_orig",
+    "val_target_dir": "./data/PL_wrap_orig",
+    "unwrap_dir": "./data/PL_unwrap_orig",
+    "wrap_dir": "./data/PL_wrap_orig",
+    "num_angles": 256,
+    "num_radii": 256,
+    "base_name": "PL"
+  },
+  "model": {
+    "name": "Unet",
+    "params":{},
+    "model_out": "./output/unet_7slojeva_16kanala_3batch_82epoha_1e4_step80.pth",
+    "wrap_pred_dir": "./output/PL_wrap_pred"
+
+  },
+  "training": {
+    "batch_size": 16,
+    "seed": 42,
+    "device": "cpu",
+    "lr": 0.0001,
+    "lr_step": 80,
+    "lr_gamma": 0.1,
+    "epochs": 80,
+    "optuna": false,
+    "n_trials": 10
+  },
+  "output": {
+    "metrics_out": "./output/metrics.txt"
+  }
+}

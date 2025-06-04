@@ -1,0 +1,10 @@
+torch
+torchvision
+numpy
+matplotlib
+scikit-image
+scipy
+pyyaml
+pillow
+optuna
+azureml-core
