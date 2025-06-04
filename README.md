@@ -1,10 +1,10 @@
-# RadioNet
+# PathLoss Terrain Prediction
 
-RadioNet is a deep learning project for processing and modeling radio signal path loss images. It provides a modular pipeline for data preprocessing, model training (with support for multiple architectures), evaluation, and postprocessing of results. The project is designed for flexibility and reproducibility, with configuration managed via a single JSON file.
+Repository for the research in potential model architectures for pathloss prediction from terrain images.
 
 ## Features
-- Data preprocessing: unwraps and prepares radio signal images for training
-- Model training: supports UNet and can be extended to other models
+- Data preprocessing
+- Model training
 - Hyperparameter optimization with Optuna
 - Evaluation and postprocessing utilities
 - Modular, configurable pipeline
