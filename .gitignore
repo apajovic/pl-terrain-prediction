@@ -1,8 +1,9 @@
 venv/
 data/
+!src/python/data/
 output/
 __pycache__/*
 *.pyc
 *.mat
-
+mlruns
 

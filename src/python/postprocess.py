@@ -8,7 +8,7 @@ import numpy as np
 from skimage.transform import resize
 from skimage.io import imsave
 from scipy.interpolate import griddata
-
+from tqdm import tqdm
 
 def postprocess(output, config, save_dir=None, show=True):
     """
@@ -26,59 +26,45 @@ def postprocess(output, config, save_dir=None, show=True):
         pred_np = output.detach().cpu().numpy().squeeze(1)
     else:
         pred_np = output
-    wrap_dir = save_dir or config.get('wrap_pred_dir', './wrap_pred')
-    os.makedirs(wrap_dir, exist_ok=True)
+    out_dir = save_dir or config.get('wrap_pred_dir', './wrap_pred')
+    os.makedirs(out_dir, exist_ok=True)
     wrapped = wrap_img(
-        wrap_dir,
         pred_np,
+        out_dir,
         (256, 256),
-        config.get('base_name', 'PL_pred'),
+        config.get('base_name', 'model_pred'),
         indikator=True
     )
-    for i in range(min(4, wrapped.shape[-1])):
-        plt.imshow(wrapped[:, :, i], cmap='gray')
-        plt.title(f'Postprocessed {i+1}')
-        if save_dir:
-            plt.savefig(os.path.join(wrap_dir, f'postprocessed_{i+1}.png'))
-        if show:
-            plt.show()
-        plt.close()
+    
     return wrapped
 
 
-
-
-
-def wrap_img(dir_wrap: str, tensor_unwrap, img_size:tuple , base_name:str, indikator:bool):
+def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, indikator:bool):
     """
     Funkcija koja unwrap slike vraca u originalni radijalni oblik
-    dir_wrap: direktorijum u kojem cemo cuvati kreirane slike
+    out_dir: direktorijum u kojem cemo cuvati kreirane slike
     tensor_unwrap: tensor sa slikama za obradu
     img_size: veličina slike (tuple)
     base_name: osnova za string u nazivu slike
     indikator: da li je slika u opsegu 0-1 (True) ili 0-255 (False)
     """
-    if not os.path.exists(dir_wrap):
-        os.makedirs(dir_wrap)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
     wrap_img_tensor = []
-    for i in range(tensor_unwrap.shape[0]):
-        unwrap_img = np.squeeze(tensor_unwrap[i, :, :])
+    for i in tqdm(range(images.shape[0]), desc='Wrapping images'):
+        unwrap_img = np.squeeze(images[i, :, :])
         center = (unwrap_img.shape[0] / 2, unwrap_img.shape[1] / 2)
-        wrp_img = radial_wrap(unwrap_img, img_size, center)
-        wrap_img_tensor.append(wrp_img)
-    wrap_img_tensor = np.stack(wrap_img_tensor, axis=-1)
-    # Cuvanje unwrap slika
-    for i in range(wrap_img_tensor.shape[-1]):
-        img_name = f"{base_name}_wrap{i+1:03d}.png"
-        fileName = os.path.join(dir_wrap, img_name)
-        if indikator:
-            img_round = (wrap_img_tensor[:, :, i] * 255).astype(np.uint8)
-        else:
-            img_round = wrap_img_tensor[:, :, i].astype(np.uint8)
+        wrp_img = unwrap_img#radial_wrap(unwrap_img, img_size, center)
+        
+        wrp_img = wrp_img * 255 if indikator else wrp_img
+        wrp_img = wrp_img.astype(np.uint8)
+        output_image_name = os.path.join(out_dir, f"{base_name}_wrap{i+1:03d}.png")
+
         img_res = resize(
-            img_round, (256, 256), order=1, preserve_range=True
+            wrp_img, (256, 256), order=1, preserve_range=True
         ).astype(np.uint8)
-        imsave(fileName, img_res)
+        imsave(output_image_name, img_res)
+        
     return wrap_img_tensor
 
 

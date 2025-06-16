@@ -72,5 +72,6 @@ class UNet(nn.Module):
         dec3 = self.dec3(torch.cat((self.up3(dec4), enc3), dim=1))
         dec2 = self.dec2(torch.cat((self.up2(dec3), enc2), dim=1))
         dec1 = self.dec1(torch.cat((self.up1(dec2), enc1), dim=1))
+
         return self.final(dec1)
 

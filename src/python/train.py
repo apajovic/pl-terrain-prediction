@@ -2,8 +2,9 @@
 # Main training script (configurable, supports Optuna, local/AML)
 import os
 import torch
+import mlflow
 
-from data.dataloader import get_dataloader
+from data.dataloader import get_dataloaders
 import matplotlib.pyplot as plt
 from config import get_config
 from utils import set_seed
@@ -26,7 +27,7 @@ def preprocess_data(config):
 
 def postprocess_and_plot(pred_tensor, config, save_dir=None, show=True):
     pred_np = pred_tensor.detach().cpu().numpy().squeeze(1)
-    wrap_dir = save_dir or config.get('model.wrap_pred_dir', './wrap_pred')
+    wrap_dir = save_dir or config.get('output.wrap_pred_dir', './wrap_pred')
     os.makedirs(wrap_dir, exist_ok=True)
     wrapped = wrap_img(
         wrap_dir,
@@ -40,6 +41,8 @@ def postprocess_and_plot(pred_tensor, config, save_dir=None, show=True):
         plt.title(f'Postprocessed {i+1}')
         if save_dir:
             plt.savefig(os.path.join(wrap_dir, f'postprocessed_{i+1}.png'))
+            mlflow.log_artifact(os.path.join(wrap_dir, f'postprocessed_{i+1}.png'),
+                                 artifact_path="output_images")
         if show:
             plt.show()
         plt.close()
@@ -83,19 +86,28 @@ def get_model(config):
         raise ValueError(f"Unknown model name: {model_name}")
 
 
-def objective(trial):
+def objective(trial, num_epochs=10):
     config = get_config()
     set_seed(config.get('training.seed', 42))
+    
+    # trial suggestions for hyperparameters
     lr = trial.suggest_loguniform('lr', 1e-5, 1e-3)
-    batch_size = trial.suggest_categorical('batch_size', [8, 16, 32])
-    config.config['batch_size'] = batch_size
+    # batch_size = trial.suggest_categorical('batch_size', [8, 16, 32])
+    channels = trial.suggest_categorical('channels', [8, 16, 32, 64])
+    layers = trial.suggest_categorical('layers', [3, 5, 7])
+    
+    config.config['model']['params']['channels'] = channels
+    config.config['model']['params']['layers'] = layers
+    
     model = get_model(config).to(config.get('training.device', 'cpu'))
-    train_loader = get_dataloader(config, train=True)
-    val_loader = get_dataloader(config, train=False)
+    train_loader, val_loader = get_dataloaders(config, val_split=0.1)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    train_one_epoch(
-        model, train_loader, criterion, optimizer, config.get('training.device', 'cpu'))
+    for _ in range(num_epochs):
+        train_one_epoch(
+            model, train_loader, criterion, optimizer, config.get('training.device', 'cpu'))
+        
+        
     val_loss, _ = validate(
         model, val_loader, criterion, config.get('training.device', 'cpu'))
     return val_loss
@@ -113,8 +125,7 @@ def main():
         print("Preprocessing done.")
     else:
         print("Skipping preprocessing.")
-    train_loader = get_dataloader(config, train=True)
-    val_loader = get_dataloader(config, train=False)
+    train_loader, val_loader = get_dataloaders(config, val_split=0.1)
     print("Data loaders ready.")
     model = get_model(config).to(device)
     print(f"Model '{config.get('model.name', 'unet')}' initialized.")
@@ -126,31 +137,61 @@ def main():
     num_epochs = config.get('training.epochs', 150)
     best_val_loss = float('inf')
     best_preds = None
+    mlflow.start_run(run_name="train")
+    mlflow.log_params({
+        'lr': config.get('training.lr', 1e-4),
+        'batch_size': config.get('training.batch_size', 16),
+        'epochs': num_epochs,
+        'model': config.get('model.name', 'unet'),
+        'channels': config.get('model.params.channels', 16),
+        'layers': config.get('model.params.layers', 7)
+    })
+    
     for epoch in range(num_epochs):
         print(f"Epoch {epoch+1}/{num_epochs} starting...")
+        
         train_loss = train_one_epoch(
             model, train_loader, criterion, optimizer, device)
         val_loss, preds = validate(model, val_loader, criterion, device)
         scheduler.step()
+        
         print(f"Epoch {epoch+1}/{num_epochs} | Train Loss: {train_loss:.4f} | "
               f"Val Loss: {val_loss:.4f}")
+        mlflow.log_metrics({
+            'train_loss': train_loss,
+            'val_loss': val_loss
+        }, step=epoch)
+        
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_preds = preds
+            model_path = config.get('training.model_out', './best_model.pth')
             torch.save(
                 model.state_dict(),
-                config.get('model.model_out', './best_model.pth'))
+                model_path)
+            mlflow.log_artifact(model_path, artifact_path="models")
             print(f"New best model saved at epoch {epoch+1} with val loss {val_loss:.4f}")
+    
     if best_preds is not None:
         print("Postprocessing and plotting best predictions...")
         postprocess_and_plot(
-            best_preds, config, save_dir=config.get('model.wrap_pred_dir'), show=True)
+            best_preds, config, save_dir=config.get('output.wrap_pred_dir'), show=True)
         print("Postprocessing done.")
+        # Optionally log output images/metrics
+        metrics_path = config.get('output.metrics_out', './metrics.txt')
+        if os.path.exists(metrics_path):
+            mlflow.log_artifact(metrics_path, artifact_path="metrics")
+    mlflow.end_run()
 
 
 if __name__ == '__main__':
-    config = get_config()
-    if config.get('training.optuna', False):
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--optuna', action='store_true', help='Enable Optuna hyperparameter search')
+    parser.add_argument('-c', '--config', default='default_config.json', help='Path to configuration file')
+    args = parser.parse_args()
+    config = get_config(args.config)
+    if args.optuna:
         print("Optuna hyperparameter search enabled.")
         study = optuna.create_study(direction='minimize')
         study.optimize(objective, n_trials=config.get('training.n_trials', 10))

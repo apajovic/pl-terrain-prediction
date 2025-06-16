@@ -1,35 +1,38 @@
 {
   "data": {
     "skip_preprocess": true,
-    "train_input_dir": "./data/PL_unwrap_orig",
-    "train_target_dir": "./data/PL_wrap_orig",
-    "val_input_dir": "./data/PL_unwrap_orig",
-    "val_target_dir": "./data/PL_wrap_orig",
-    "unwrap_dir": "./data/PL_unwrap_orig",
-    "wrap_dir": "./data/PL_wrap_orig",
+    "input_dir": "./data/ter_unwrap",
+    "target_dir": "./data/PL_unwrap_orig",
+    "unwrap_dir": "./output/ter_unwrap",
+    "wrap_dir": "./data/ter_wrap",
     "num_angles": 256,
     "num_radii": 256,
     "base_name": "PL"
   },
   "model": {
     "name": "Unet",
-    "params":{},
-    "model_out": "./output/unet_7slojeva_16kanala_3batch_82epoha_1e4_step80.pth",
-    "wrap_pred_dir": "./output/PL_wrap_pred"
-
+    "params":{
+      "channels": 16,
+      "layers": 7
+    }
   },
   "training": {
-    "batch_size": 16,
+    "batch_size": 32,
     "seed": 42,
-    "device": "cpu",
+    "device": "cuda",
     "lr": 0.0001,
-    "lr_step": 80,
+    "lr_step": 130,
     "lr_gamma": 0.1,
-    "epochs": 80,
-    "optuna": false,
-    "n_trials": 10
+    "epochs": 100,
+    "n_trials": 10,
+    "model_out": "./output/best_model.pth"
+  },
+  "evaluation": {
+    "path_from_mlflow": false,
+    "model_path": "./output/best_model.pth"
   },
   "output": {
-    "metrics_out": "./output/metrics.txt"
+    "metrics_out": "./output/metrics_mine.txt",
+    "wrap_pred_dir": "./output/PL_wrap_pred_mine"
   }
 }

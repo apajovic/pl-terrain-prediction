@@ -70,17 +70,18 @@ All settings are managed in `default_config.json` using subkeys for logical grou
 ```json
 {
   "data": {
-    "train_input_dir": "./data/PL_unwrap_orig",
-    "train_target_dir": "./data/PL_wrap_orig",
+    "input_dir": "./data/ter_unwrap",
+    "target_dir": "./data/PL_unwrap_orig",
     ...
   },
   "model": {
-    "name": "unet",
-    "model_out": "./output/best_model.pth"
+    "name": "unet"
+    
   },
   "training": {
     "batch_size": 16,
     "epochs": 150,
+    "model_out": "./output/best_model.pth"
     ...
   },
   "output": {
