@@ -5,6 +5,7 @@ from skimage.io import imread, imsave
 
 from scipy.interpolate import RegularGridInterpolator
 from config import get_config
+from joblib import Parallel, delayed
 from tqdm import tqdm
 
 import argparse
@@ -24,7 +25,29 @@ def make_static(image, base):
     return np.clip(normalize_img(image) - normalize_img(base), a_min=0, a_max=255)
     
     
-def unwrap_img(input_dir, output_dir, num_angles, num_radii, img_size, statify=False, base_img_path="data/base/out_unwrapped/no_obstacle_unwrapped.png"):
+def process_single_image(file_name, input_dir, output_dir, num_angles, num_radii, img_size, statify, base_img_path):
+    full_path = os.path.join(input_dir, file_name)
+    img = imread(full_path)
+
+    center = (img.shape[0] / 2, img.shape[1] / 2)
+    unwrap_img_ = radial_unwrap(img, num_angles, num_radii, center)
+
+    if statify:
+        base_img = imread(base_img_path)
+        if base_img.shape != img.shape:
+            base_img = resize(base_img, img_size, order=1, preserve_range=True).astype(np.uint8)
+        img = make_static(img, base_img)
+
+    out_img_name = f"{file_name.split('.')[0]}_unwrap.png"
+    fileName = os.path.join(output_dir, out_img_name)
+    img_out = unwrap_img_.astype(np.uint8)
+    if img_out.shape[0] != 256 or img_out.shape[1] != 256:
+        img_out = resize(
+            img_out, img_size, order=1, preserve_range=True
+        ).astype(np.uint8)
+    imsave(fileName, img_out)
+
+def unwrap_img(input_dir, output_dir, num_angles, num_radii, img_size, statify=False, base_img_path="data/base/out_unwrapped/no_obstacle_unwrapped.png", n_jobs=-1):
     """
     Kreira unwrap slike sa zadatim parametrima, radi resize na 256x256 i cuva ih kao
     .png sa pikselima u opsegu 0-255.
@@ -36,28 +59,12 @@ def unwrap_img(input_dir, output_dir, num_angles, num_radii, img_size, statify=F
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     file_list = sorted([f for f in os.listdir(input_dir) if f.endswith('.png')])
-    
-    for file_name in tqdm(file_list):
-        full_path = os.path.join(input_dir, file_name)
-        img = imread(full_path)
 
-        center = (img.shape[0] / 2, img.shape[1] / 2)     
-        unwrap_img_ = radial_unwrap(img, num_angles, num_radii, center)
-        
-        if statify:
-            base_img = imread(base_img_path)
-            if base_img.shape != img.shape:
-                base_img = resize(base_img, img_size, order=1, preserve_range=True).astype(np.uint8)
-            img = make_static(img, base_img)
-        
-        out_img_name = f"{file_name.split('.')[0]}_unwrap.png"
-        fileName = os.path.join(output_dir, out_img_name)
-        img_out = unwrap_img_.astype(np.uint8)
-        if img_out.shape[0] != 256 or img_out.shape[1] != 256:
-            img_out = resize(
-                img_out, img_size, order=1, preserve_range=True
-            ).astype(np.uint8)
-        imsave(fileName, img_out)
+    Parallel(n_jobs=n_jobs)(
+        delayed(process_single_image)(
+            file_name, input_dir, output_dir, num_angles, num_radii, img_size, statify, base_img_path
+        ) for file_name in tqdm(file_list)
+    )
 
 
 def apply_circular_mask(img):
@@ -81,11 +88,8 @@ def apply_circular_mask(img):
 
 def radial_unwrap(img, num_angles, num_radii, center):
     """
-    Transformiše sliku iz polarnih pravaca u pravougaoni oblik
-    img: ulazna slika (2D matrica)
-    num_angles: broj pravaca (ugao rezolucija)
-    num_radii: broj rastojanja (koliko uzoraka po pravcu)
-    center: (yc, xc) – centar slike
+    Transform image from polar coordinates to rectangular form.
+    Optimized for speed by vectorizing coordinate generation and interpolation.
     """
     theta = np.linspace(0, 2 * np.pi, num_angles, endpoint=False)
     max_r = min(
@@ -93,17 +97,17 @@ def radial_unwrap(img, num_angles, num_radii, center):
         img.shape[1] - center[1]
     )
     r = np.linspace(0, max_r, num_radii)
-    transformed_img = np.zeros((num_radii, num_angles))
     img = img.astype(float)
-    # Use RegularGridInterpolator instead of interp2d
     y = np.arange(img.shape[0])
     x = np.arange(img.shape[1])
     interpolator = RegularGridInterpolator((y, x), img, bounds_error=False, fill_value=0)
-    for i in range(num_angles):
-        for j in range(num_radii):
-            xq = center[1] + r[j] * np.cos(theta[i])
-            yq = center[0] + r[j] * np.sin(theta[i])
-            transformed_img[j, i] = interpolator([[yq, xq]])[0]
+
+    # Vectorized meshgrid for all (r, theta) pairs
+    rr, tt = np.meshgrid(r, theta, indexing='ij')
+    xq = center[1] + rr * np.cos(tt)
+    yq = center[0] + rr * np.sin(tt)
+    coords = np.stack([yq, xq], axis=-1).reshape(-1, 2)
+    transformed_img = interpolator(coords).reshape(num_radii, num_angles)
     return transformed_img
 
 if __name__ == '__main__':
@@ -113,9 +117,9 @@ if __name__ == '__main__':
                         help='Directory containing input images for unwrapping')
     parser.add_argument('--output_dir', type=str, default='./data/PL_preprocessed',
                         help='Directory to save unwrapped images')
-    parser.add_argument('--num_angles', type=int, default=512,
+    parser.add_argument('--num_angles', type=int, default=256,
                         help='Number of angles for unwrapping')
-    parser.add_argument('--num_radii', type=int, default=512,
+    parser.add_argument('--num_radii', type=int, default=256,
                         help='Number of radii for unwrapping')
     parser.add_argument('--img_size', type=tuple, default=(256, 256),
                         help='Size of the output images (height, width)')

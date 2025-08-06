@@ -1,5 +1,6 @@
 # data/dataloader.py
 # DataLoader and preprocessing utilities
+import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
 from PIL import Image
@@ -42,7 +43,7 @@ def get_dataloaders(config, val_split=0.2):
     batch_size = config.get('training.batch_size', 16)
     val_size = int(len(dataset) * val_split)
     train_size = len(dataset) - val_size
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size], generator=torch.Generator().manual_seed(config.get('training.seed', 42)))
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader

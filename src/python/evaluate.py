@@ -9,14 +9,14 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from postprocess import postprocess
+from models import get_model
 import mlflow
 
 # TODO: Add more model imports as implemented
 
-def evaluate():
-    config = get_config()
+def evaluate(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = unet.UNet(config).to(device)
+    model = get_model(config).to(device)
     # Load weights
     weights_path = config.get('evaluation.model_path', './best_model.pth')
     path_from_mlflow = config.get('evaluation.path_from_mlflow', False)
@@ -72,6 +72,7 @@ def evaluate():
 
     # Postprocess and plot/save predictions
     postprocess(preds, config, save_dir=config.get('output.wrap_pred_dir'), show=True)
+    postprocess(targets, config, save_dir=config.get('output.wrap_targets_dir'), show=True)
     # Optionally: save metrics
     metrics_path = config.get('output.metrics_out', './metrics.txt')
     with open(metrics_path, 'w') as f:
@@ -84,4 +85,9 @@ def evaluate():
     mlflow.end_run()
 
 if __name__ == '__main__':
-    evaluate()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config', default='default_config.json', help='Path to configuration file')
+    args = parser.parse_args()
+    config = get_config(args.config)
+    evaluate(config)

@@ -11,13 +11,13 @@ from utils import set_seed
 import optuna
 from preprocess import unwrap_img
 from postprocess import wrap_img
-from models import unet
+from models import get_model
 
 
 def preprocess_data(config):
     unwrap_img(
-        config.get('data.unwrap_dir'),
         config.get('data.wrap_dir'),
+        config.get('data.unwrap_dir'),
         config.get('data.num_angles', 256),
         config.get('data.num_radii', 256),
         (256, 256),
@@ -77,13 +77,6 @@ def validate(model, loader, criterion, device):
     return val_loss / len(loader), preds
 
 
-def get_model(config):
-    model_name = config.get('model.name', 'unet').lower()
-    if model_name == 'unet':
-        return unet.UNet(config)
-    # Add more models here as needed
-    else:
-        raise ValueError(f"Unknown model name: {model_name}")
 
 
 def objective(trial, num_epochs=10):
@@ -113,13 +106,12 @@ def objective(trial, num_epochs=10):
     return val_loss
 
 
-def main():
-    config = get_config()
+def main(config):
     print("Loaded config:", config.as_dict())
     set_seed(config.get('training.seed', 42))
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     config.config['device'] = device
-    if not config.get('data.skip_preprocess', False):
+    if not config.get('data', {}).get('skip_preprocess', False):
         print("Starting preprocessing...")
         preprocess_data(config)
         print("Preprocessing done.")
@@ -137,7 +129,7 @@ def main():
     num_epochs = config.get('training.epochs', 150)
     best_val_loss = float('inf')
     best_preds = None
-    mlflow.start_run(run_name="train")
+    mlflow.start_run()
     mlflow.log_params({
         'lr': config.get('training.lr', 1e-4),
         'batch_size': config.get('training.batch_size', 16),
@@ -197,4 +189,4 @@ if __name__ == '__main__':
         study.optimize(objective, n_trials=config.get('training.n_trials', 10))
         print('Best trial:', study.best_trial.params)
     else:
-        main()
+        main(config)

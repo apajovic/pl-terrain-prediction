@@ -1,0 +1,35 @@
+{
+  "data": {
+    "skip_preprocess": true,
+    "input_dir": "./data/v2/teren_unwrap_all",
+    "target_dir": "./data/v2/pl_all_static_unwrapped",
+    "unwrap_dir": "./data/v2/teren_unwrap_all",
+    "wrap_dir": "./data/v2/teren_all",
+    "num_angles": 256,
+    "num_radii": 256,
+    "base_name": "PL"
+  },
+  "model": {
+    "name": "pmnet_v3"
+  },
+  "training": {
+    "batch_size": 16,
+    "seed": 42,
+    "device": "cuda",
+    "lr": 0.0001,
+    "lr_step": 130,
+    "lr_gamma": 0.1,
+    "epochs": 150,
+    "n_trials": 10,
+    "model_out": "/home/acap/faks/pl-terrain-prediction/output/pmnet_v3/pmnet_v3_.pth"
+  },
+  "evaluation": {
+    "path_from_mlflow": false,
+    "model_path": "/home/acap/faks/pl-terrain-prediction/output/pmnet_v3/pmnet_v3_.pth"
+  },
+  "output": {
+    "metrics_out": "/home/acap/faks/pl-terrain-prediction/output/pmnet_v3.txt",
+    "wrap_pred_dir": "/home/acap/faks/pl-terrain-prediction/output/pmnet_v3",
+    "wrap_targets_dir": "/home/acap/faks/pl-terrain-prediction/output/targets"
+  }
+}

@@ -54,7 +54,7 @@ def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, indikat
     for i in tqdm(range(images.shape[0]), desc='Wrapping images'):
         unwrap_img = np.squeeze(images[i, :, :])
         center = (unwrap_img.shape[0] / 2, unwrap_img.shape[1] / 2)
-        wrp_img = unwrap_img#radial_wrap(unwrap_img, img_size, center)
+        wrp_img = radial_wrap(unwrap_img, img_size, center)
         
         wrp_img = wrp_img * 255 if indikator else wrp_img
         wrp_img = wrp_img.astype(np.uint8)
@@ -68,7 +68,7 @@ def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, indikat
     return wrap_img_tensor
 
 
-def radial_wrap(transformed_img, img_size, center):
+def radial_wrap_depracated(transformed_img, img_size, center):
     """
     Rekonstruiše sliku iz unwrap-ovanog oblika uz interpolaciju unutar kruga
     transformed_img: matrica: kolone = pravci, redovi = rastojanje od centra
@@ -104,5 +104,62 @@ def radial_wrap(transformed_img, img_size, center):
     img[circle_mask & np.isnan(img)] = interp_values[
         circle_mask & np.isnan(img)
     ]
+    img[~circle_mask] = 0
+    return img
+
+def radial_wrap(transformed_img, img_size, center):
+    """
+    Reconstructs image from unwrapped form using interpolation within a circle.
+    Args:
+        transformed_img: 2D array (radii x angles)
+        img_size: (height, width)
+        center: (yc, xc)
+    Returns:
+        img: reconstructed image
+    """
+    num_radii, num_angles = transformed_img.shape
+    theta = np.linspace(0, 2 * np.pi, num_angles, endpoint=False)
+    max_r = min(center[0], center[1], img_size[0] - center[0], img_size[1] - center[1])
+    r = np.linspace(0, max_r, num_radii)
+
+    # Precompute coordinates for all (r, theta)
+    rr, tt = np.meshgrid(r, theta, indexing='ij')
+    x = center[1] + rr * np.cos(tt)
+    y = center[0] + rr * np.sin(tt)
+    xi = np.round(x).astype(int)
+    yi = np.round(y).astype(int)
+
+    img = np.zeros(img_size, dtype=np.float32)
+    weight = np.zeros(img_size, dtype=np.float32)
+
+    # Flatten arrays for vectorized assignment
+    flat_xi = xi.flatten()
+    flat_yi = yi.flatten()
+    flat_vals = transformed_img.flatten()
+
+    # Filter valid indices
+    valid = (
+        (flat_xi >= 0) & (flat_xi < img_size[1]) &
+        (flat_yi >= 0) & (flat_yi < img_size[0])
+    )
+    np.add.at(img, (flat_yi[valid], flat_xi[valid]), flat_vals[valid])
+    np.add.at(weight, (flat_yi[valid], flat_xi[valid]), 1)
+
+    # Normalize
+    img = np.divide(img, weight, out=np.zeros_like(img), where=weight != 0)
+
+    # Interpolate missing values inside circle
+    XX, YY = np.meshgrid(np.arange(img_size[1]), np.arange(img_size[0]))
+    dist_from_center = np.sqrt((XX - center[1]) ** 2 + (YY - center[0]) ** 2)
+    circle_mask = dist_from_center <= max_r
+
+    nan_mask = np.isnan(img) & circle_mask
+    if np.any(nan_mask):
+        Y_known, X_known = np.where(~np.isnan(img))
+        V_known = img[~np.isnan(img)]
+        points = np.stack((X_known, Y_known), axis=-1)
+        interp_values = griddata(points, V_known, (XX, YY), method='nearest')
+        img[nan_mask] = interp_values[nan_mask]
+
     img[~circle_mask] = 0
     return img

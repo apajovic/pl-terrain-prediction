@@ -10,29 +10,26 @@
     "base_name": "PL"
   },
   "model": {
-    "name": "Unet",
-    "params":{
-      "channels": 16,
-      "layers": 7
-    }
+    "name": "transunet"
   },
   "training": {
-    "batch_size": 32,
+    "batch_size": 1,
     "seed": 42,
     "device": "cuda",
     "lr": 0.0001,
     "lr_step": 130,
     "lr_gamma": 0.1,
-    "epochs": 100,
+    "epochs": 150,
     "n_trials": 10,
-    "model_out": "./output/best_model.pth"
+    "model_out": "./output/transunet_v1.pth"
   },
   "evaluation": {
     "path_from_mlflow": false,
-    "model_path": "./output/best_model.pth"
+    "model_path": "./output/transunet_v1.pth"
   },
   "output": {
-    "metrics_out": "./output/metrics_mine.txt",
-    "wrap_pred_dir": "./output/PL_wrap_pred_mine"
+    "metrics_out": "./output/transunet.txt",
+    "wrap_pred_dir": "./output/transunet",
+    "wrap_targets_dir": "./output/targets"
   }
 }

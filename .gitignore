@@ -7,3 +7,5 @@ __pycache__/*
 *.mat
 mlruns
 
+pat.txt
+src/python/models/pretrained
