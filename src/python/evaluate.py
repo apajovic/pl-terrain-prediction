@@ -1,7 +1,7 @@
 # evaluate.py
 # Model evaluation script
 from models import unet  # Add more models as needed
-from data.dataloader import get_dataloaders
+from data.dataloader import get_dataloaders, BASIC_TRANSFORM, ROW_SPLIT_TRANSFORM, RowAverageSplitInverseTransform
 from config import get_config
 import torch
 import os
@@ -11,8 +11,13 @@ import matplotlib.pyplot as plt
 from postprocess import postprocess
 from models import get_model
 import mlflow
+import tqdm
+from skimage.io import imshow
 
 # TODO: Add more model imports as implemented
+
+def normalize_tensor(tensor):
+    return (tensor - tensor.min()) / (tensor.max() - tensor.min()) 
 
 def evaluate(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -30,14 +35,19 @@ def evaluate(config):
         print(f"Loaded weights from {weights_path}")
     else:
         print(f"Weights not found at {weights_path}, using random init.")
-    _, test_loader = get_dataloaders(config)
+    
     model.eval()
     preds = []
     targets = []
     total_pred_time = 0.0
     num_batches = 0
+    two_channel_split = config.get('data.split_channels', False)
+    
+    transform = ROW_SPLIT_TRANSFORM if two_channel_split else BASIC_TRANSFORM
+    _, test_loader = get_dataloaders(config, transform=transform, val_split=0.01)
+    
     with torch.no_grad():
-        for inputs, targs in test_loader:
+        for inputs, targs in tqdm.tqdm(test_loader, total=len(test_loader)):
             inputs = inputs.to(device)
             targs = targs.to(device)
             start_time = time.perf_counter()
@@ -69,10 +79,17 @@ def evaluate(config):
         'total_pred_time': total_pred_time,
         'avg_pred_time_per_batch': avg_pred_time
     })
+    
+    if two_channel_split:
+        preds = preds[:, 0, :, :] + preds[:, 1, :, :]
+        preds = normalize_tensor(preds).unsqueeze(1)
+        targets = targets[:, 0, :, :] + targets[:, 1, :, :]
+        targets = normalize_tensor(targets).unsqueeze(1)
 
     # Postprocess and plot/save predictions
-    postprocess(preds, config, save_dir=config.get('output.wrap_pred_dir'), show=True)
-    postprocess(targets, config, save_dir=config.get('output.wrap_targets_dir'), show=True)
+    
+    postprocess(preds, config, save_dir=config.get('output.wrap_pred_dir'), show=True, is_tensor=True)
+    postprocess(targets, config, save_dir=config.get('output.wrap_targets_dir'), show=True, is_tensor=True)
     # Optionally: save metrics
     metrics_path = config.get('output.metrics_out', './metrics.txt')
     with open(metrics_path, 'w') as f:

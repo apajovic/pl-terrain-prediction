@@ -4,7 +4,7 @@ import os
 import torch
 import mlflow
 
-from data.dataloader import get_dataloaders
+from data.dataloader import get_dataloaders, ROW_SPLIT_TRANSFORM, BASIC_TRANSFORM
 import matplotlib.pyplot as plt
 from config import get_config
 from utils import set_seed
@@ -12,6 +12,7 @@ import optuna
 from preprocess import unwrap_img
 from postprocess import wrap_img
 from models import get_model
+import tqdm
 
 
 def preprocess_data(config):
@@ -52,7 +53,8 @@ def postprocess_and_plot(pred_tensor, config, save_dir=None, show=True):
 def train_one_epoch(model, loader, criterion, optimizer, device):
     model.train()
     running_loss = 0.0
-    for inputs, targets in loader:
+    progress_bar = tqdm.tqdm(loader, desc="Training", total=len(loader), leave=False, dynamic_ncols=True)
+    for inputs, targets in progress_bar:
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
@@ -60,6 +62,8 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
+        progress_bar.set_postfix(loss=loss.item())
+    progress_bar.close()
     return running_loss / len(loader)
 
 
@@ -93,7 +97,10 @@ def objective(trial, num_epochs=10):
     config.config['model']['params']['layers'] = layers
     
     model = get_model(config).to(config.get('training.device', 'cpu'))
-    train_loader, val_loader = get_dataloaders(config, val_split=0.1)
+    two_channel_split = config.get('data.split_channels', False)   
+    
+    transform = ROW_SPLIT_TRANSFORM if two_channel_split else BASIC_TRANSFORM
+    train_loader, val_loader = get_dataloaders(config, val_split=0.1, transform=transform)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     for _ in range(num_epochs):
@@ -117,7 +124,10 @@ def main(config):
         print("Preprocessing done.")
     else:
         print("Skipping preprocessing.")
-    train_loader, val_loader = get_dataloaders(config, val_split=0.1)
+    two_channel_split = config.get('data.split_channels', False)   
+    
+    transform = ROW_SPLIT_TRANSFORM if two_channel_split else BASIC_TRANSFORM
+    train_loader, val_loader = get_dataloaders(config, val_split=0.1, transform=transform)
     print("Data loaders ready.")
     model = get_model(config).to(device)
     print(f"Model '{config.get('model.name', 'unet')}' initialized.")

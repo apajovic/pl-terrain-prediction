@@ -10,7 +10,7 @@ from skimage.io import imsave
 from scipy.interpolate import griddata
 from tqdm import tqdm
 
-def postprocess(output, config, save_dir=None, show=True):
+def postprocess(output, config, save_dir=None, show=True, is_tensor=True):
     """
     Postprocesses model output tensor using wrap_img and plots/saves results.
     Args:
@@ -33,20 +33,20 @@ def postprocess(output, config, save_dir=None, show=True):
         out_dir,
         (256, 256),
         config.get('base_name', 'model_pred'),
-        indikator=True
+        is_tensor=is_tensor
     )
     
     return wrapped
 
 
-def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, indikator:bool):
+def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, is_tensor:bool):
     """
     Funkcija koja unwrap slike vraca u originalni radijalni oblik
     out_dir: direktorijum u kojem cemo cuvati kreirane slike
     tensor_unwrap: tensor sa slikama za obradu
     img_size: veličina slike (tuple)
     base_name: osnova za string u nazivu slike
-    indikator: da li je slika u opsegu 0-1 (True) ili 0-255 (False)
+    is_tensor: da li je slika u opsegu 0-1 (True) ili 0-255 (False)
     """
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
@@ -56,7 +56,7 @@ def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, indikat
         center = (unwrap_img.shape[0] / 2, unwrap_img.shape[1] / 2)
         wrp_img = radial_wrap(unwrap_img, img_size, center)
         
-        wrp_img = wrp_img * 255 if indikator else wrp_img
+        wrp_img = wrp_img * 255 if is_tensor else wrp_img
         wrp_img = wrp_img.astype(np.uint8)
         output_image_name = os.path.join(out_dir, f"{base_name}_wrap{i+1:03d}.png")
 
@@ -107,59 +107,57 @@ def radial_wrap_depracated(transformed_img, img_size, center):
     img[~circle_mask] = 0
     return img
 
+
 def radial_wrap(transformed_img, img_size, center):
-    """
-    Reconstructs image from unwrapped form using interpolation within a circle.
-    Args:
-        transformed_img: 2D array (radii x angles)
-        img_size: (height, width)
-        center: (yc, xc)
-    Returns:
-        img: reconstructed image
-    """
     num_radii, num_angles = transformed_img.shape
     theta = np.linspace(0, 2 * np.pi, num_angles, endpoint=False)
     max_r = min(center[0], center[1], img_size[0] - center[0], img_size[1] - center[1])
     r = np.linspace(0, max_r, num_radii)
 
-    # Precompute coordinates for all (r, theta)
-    rr, tt = np.meshgrid(r, theta, indexing='ij')
-    x = center[1] + rr * np.cos(tt)
-    y = center[0] + rr * np.sin(tt)
-    xi = np.round(x).astype(int)
-    yi = np.round(y).astype(int)
+    # Create meshgrid for polar coordinates
+    R, Theta = np.meshgrid(r, theta, indexing='ij')
+    X = center[1] + R * np.cos(Theta)
+    Y = center[0] + R * np.sin(Theta)
 
-    img = np.zeros(img_size, dtype=np.float32)
-    weight = np.zeros(img_size, dtype=np.float32)
+    # Round and convert to integer indices
+    Xi = np.round(X).astype(int)
+    Yi = np.round(Y).astype(int)
 
-    # Flatten arrays for vectorized assignment
-    flat_xi = xi.flatten()
-    flat_yi = yi.flatten()
-    flat_vals = transformed_img.flatten()
+    # Create output image and weight matrix
+    img = np.zeros(img_size)
+    weight = np.zeros(img_size)
 
-    # Filter valid indices
-    valid = (
-        (flat_xi >= 0) & (flat_xi < img_size[1]) &
-        (flat_yi >= 0) & (flat_yi < img_size[0])
-    )
-    np.add.at(img, (flat_yi[valid], flat_xi[valid]), flat_vals[valid])
-    np.add.at(weight, (flat_yi[valid], flat_xi[valid]), 1)
+    # Mask for valid indices
+    valid_mask = (Xi >= 0) & (Xi < img_size[1]) & (Yi >= 0) & (Yi < img_size[0])
 
-    # Normalize
-    img = np.divide(img, weight, out=np.zeros_like(img), where=weight != 0)
+    # Flatten arrays for indexing
+    Xi_flat = Xi[valid_mask]
+    Yi_flat = Yi[valid_mask]
+    values_flat = transformed_img[valid_mask]
 
-    # Interpolate missing values inside circle
+    # Accumulate values and weights
+    np.add.at(img, (Yi_flat, Xi_flat), values_flat)
+    np.add.at(weight, (Yi_flat, Xi_flat), 1)
+
+    # Normalize image
+    weight[weight == 0] = np.nan
+    img = img / weight
+
+    # Interpolate missing values within the valid circle
     XX, YY = np.meshgrid(np.arange(img_size[1]), np.arange(img_size[0]))
     dist_from_center = np.sqrt((XX - center[1]) ** 2 + (YY - center[0]) ** 2)
     circle_mask = dist_from_center <= max_r
 
-    nan_mask = np.isnan(img) & circle_mask
-    if np.any(nan_mask):
-        Y_known, X_known = np.where(~np.isnan(img))
-        V_known = img[~np.isnan(img)]
-        points = np.stack((X_known, Y_known), axis=-1)
-        interp_values = griddata(points, V_known, (XX, YY), method='nearest')
-        img[nan_mask] = interp_values[nan_mask]
+    known_mask = ~np.isnan(img)
+    Y_known, X_known = np.where(known_mask)
+    V_known = img[known_mask]
+    points = np.stack((X_known, Y_known), axis=-1)
 
+    interp_values = griddata(points, V_known, (XX, YY), method='nearest')
+    missing_mask = circle_mask & np.isnan(img)
+    img[missing_mask] = interp_values[missing_mask]
+
+    # Zero out values outside the circle
     img[~circle_mask] = 0
+
     return img

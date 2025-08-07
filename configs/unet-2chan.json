@@ -1,0 +1,37 @@
+{
+  "data": {
+    "skip_preprocess": true,
+    "split_channels": true,
+    "wrap_dir": "./data/v2/teren_all",
+    "unwrap_dir": "./data/v2/teren_unwrap_all",
+    "input_dir": "./data/v2/teren_unwrap_all",
+    "target_dir": "./data/v2/pl_all_unwrapped",
+    "num_angles": 256,
+    "num_radii": 256,
+    "base_name": "PL"
+  },
+  "model": {
+    "name": "unet",
+    "num_output_channels": 2
+  },
+  "training": {
+    "batch_size": 16,
+    "seed": 42,
+    "device": "cuda",
+    "lr": 0.0001,
+    "lr_step": 130,
+    "lr_gamma": 0.1,
+    "epochs": 150,
+    "n_trials": 10,
+    "model_out": "/home/acap/faks/pl-terrain-prediction/output/unet-2chan/unet-2chan.pth"
+  },
+  "evaluation": {
+    "path_from_mlflow": false,
+    "model_path": "/home/acap/faks/pl-terrain-prediction/output/unet-2chan/unet-2chan.pth"
+  },
+  "output": {
+    "metrics_out": "/home/acap/faks/pl-terrain-prediction/output/unet-2chan/metrics.txt",
+    "wrap_pred_dir": "/home/acap/faks/pl-terrain-prediction/output/unet-2chan/predictions",
+    "wrap_targets_dir": "/home/acap/faks/pl-terrain-prediction/output/unet-2chan/targets"
+  }
+}

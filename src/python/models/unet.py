@@ -13,8 +13,10 @@ class UNet(nn.Module):
                 nn.Conv2d(out_channels, out_channels, 3, padding=1),
                 nn.ReLU(inplace=True)
             )
+            
+        num_channels = config.get('model.num_output_channels', 1) if config else 1
 
-        self.enc1 = conv_block(1, 16)
+        self.enc1 = conv_block(num_channels, 16)
         self.pool1 = nn.MaxPool2d(2)
         self.enc2 = conv_block(16, 32)
         self.pool2 = nn.MaxPool2d(2)
@@ -52,7 +54,7 @@ class UNet(nn.Module):
         self.up1 = nn.ConvTranspose2d(32, 16, 2, stride=2)
         self.dec1 = conv_block(32, 16)
 
-        self.final = nn.Conv2d(16, 1, kernel_size=1)
+        self.final = nn.Conv2d(16, num_channels, kernel_size=1)
 
     def forward(self, x):
         enc1 = self.enc1(x)
