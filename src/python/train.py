@@ -250,7 +250,12 @@ def main(config):
     if not config.get("training.from_scratch", False) and os.path.exists(model_path):
         if is_main_process():
             print(f"Loading model weights from checkpoint: {model_path}")
-        checkpoint = torch.load(model_path, map_location=device)
+        
+        # In DDP, load to CPU first to avoid device mismatch issues
+        # Each process only sees its own GPU, so direct GPU loading fails
+        map_location = 'cpu' if is_distributed_training() else device
+        checkpoint = torch.load(model_path, map_location=map_location)
+        
         # Handle loading checkpoints from both DDP and single-GPU models
         try:
             model.load_state_dict(checkpoint)
@@ -264,6 +269,9 @@ def main(config):
                     model.load_state_dict(checkpoint)
             else:
                 raise
+        
+        if is_main_process():
+            print("Checkpoint loaded successfully.")
     else:
         if is_main_process():
             print("Training from scratch (no checkpoint loaded).")
