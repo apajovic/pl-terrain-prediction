@@ -1,7 +1,7 @@
 # data/dataloader.py
 # DataLoader and preprocessing utilities
 import torch
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, random_split, DistributedSampler
 from torchvision import transforms
 from PIL import Image
 import os
@@ -108,25 +108,76 @@ class ImageToImageDataset(Dataset):
         return input_img, target_img
 
 
-def get_dataloaders(config, val_split=0.1, transform=BASIC_TRANSFORM):
+def get_dataloaders(config, val_split=0.1, transform=BASIC_TRANSFORM, use_ddp=False):
     """
     Get train and validation dataloaders.
     
     Args:
         config: Configuration object
         val_split: Fraction of data to use for validation
-        use_row_split: Whether to use the row average split transformation
+        transform: Transform to apply to images
+        use_ddp: Whether to use DistributedDataParallel (requires DDP initialization)
     """
-   
-
     input_dir = config.get('data.input_dir')
     target_dir = config.get('data.target_dir')
     dataset = ImageToImageDataset(input_dir, target_dir, transform=transform)
     batch_size = config.get('training.batch_size', 16)
     val_size = int(len(dataset) * val_split)
     train_size = len(dataset) - val_size
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size], generator=torch.Generator().manual_seed(config.get('training.seed', 42)))
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    train_dataset, val_dataset = random_split(
+        dataset, 
+        [train_size, val_size], 
+        generator=torch.Generator().manual_seed(config.get('training.seed', 42))
+    )
+    
+    if use_ddp:
+        # Use DistributedSampler for DDP training
+        import torch.distributed as dist
+        
+        train_sampler = DistributedSampler(
+            train_dataset,
+            num_replicas=dist.get_world_size(),
+            rank=dist.get_rank(),
+            shuffle=True,
+            seed=config.get('training.seed', 42),
+            drop_last=True,  # Drop last incomplete batch for consistency across ranks
+        )
+        
+        val_sampler = DistributedSampler(
+            val_dataset,
+            num_replicas=dist.get_world_size(),
+            rank=dist.get_rank(),
+            shuffle=False,
+            seed=config.get('training.seed', 42),
+            drop_last=False,
+        )
+        
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            sampler=train_sampler,
+            num_workers=config.get('training.num_workers', 4),
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=batch_size,
+            sampler=val_sampler,
+            num_workers=config.get('training.num_workers', 4),
+        )
+    else:
+        # Standard DataLoader for single GPU/CPU
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=config.get('training.num_workers', 0),
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=config.get('training.num_workers', 0),
+        )
+    
     return train_loader, val_loader
 

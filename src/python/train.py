@@ -2,9 +2,20 @@
 # Main training script (configurable, supports Optuna, local/AML)
 import os
 import torch
+import torch.distributed as dist
 import mlflow
 
 from data.dataloader import get_dataloaders, ROW_SPLIT_TRANSFORM, BASIC_TRANSFORM
+from ddp_utils import (
+    initialize_ddp,
+    cleanup_ddp,
+    get_rank,
+    get_world_size,
+    is_main_process,
+    is_distributed_training,
+    synchronize,
+    reduce_tensor,
+)
 import matplotlib.pyplot as plt
 from config import get_config
 from utils import set_seed
@@ -55,12 +66,23 @@ def postprocess_and_plot(pred_tensor, config, save_dir=None, show=True):
     return wrapped
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device):
+def train_one_epoch(model, loader, criterion, optimizer, device, epoch=0):
     model.train()
     running_loss = 0.0
-    progress_bar = tqdm.tqdm(
-        loader, desc="Training", total=len(loader), leave=False, dynamic_ncols=True
-    )
+    
+    # Set epoch for DistributedSampler to ensure proper shuffling across ranks
+    if hasattr(loader, "sampler") and hasattr(loader.sampler, "set_epoch"):
+        loader.sampler.set_epoch(epoch)
+    
+    # Only show progress bar on main process
+    progress_bar = None
+    if is_main_process():
+        progress_bar = tqdm.tqdm(
+            loader, desc="Training", total=len(loader), leave=False, dynamic_ncols=True
+        )
+    else:
+        progress_bar = loader
+    
     for inputs, targets in progress_bar:
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
@@ -69,9 +91,20 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
-        progress_bar.set_postfix(loss=loss.item())
-    progress_bar.close()
-    return running_loss / len(loader)
+        if is_main_process():
+            progress_bar.set_postfix(loss=loss.item())
+    
+    if is_main_process():
+        progress_bar.close()
+    
+    # Synchronize loss across all processes
+    avg_loss = running_loss / len(loader)
+    if is_distributed_training():
+        loss_tensor = torch.tensor([avg_loss], dtype=torch.float32, device=device)
+        dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
+        avg_loss = (loss_tensor.item() / get_world_size())
+    
+    return avg_loss
 
 
 def validate(model, loader, criterion, device):
@@ -84,8 +117,26 @@ def validate(model, loader, criterion, device):
             outputs = model(inputs)
             val_loss += criterion(outputs, targets).item()
             preds.append(outputs.cpu())
-    preds = torch.cat(preds, dim=0)
-    return val_loss / len(loader), preds
+    
+    preds = torch.cat(preds, dim=0) if preds else torch.tensor([])
+    
+    # Synchronize validation loss across all processes
+    avg_loss = val_loss / len(loader)
+    if is_distributed_training():
+        loss_tensor = torch.tensor([avg_loss], dtype=torch.float32, device=device)
+        dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
+        avg_loss = (loss_tensor.item() / get_world_size())
+        
+        # Gather all predictions on rank 0
+        world_size = get_world_size()
+        if get_rank() == 0:
+            gathered_preds = [torch.zeros_like(preds) for _ in range(world_size)]
+            dist.gather(preds, gathered_preds, dst=0)
+            preds = torch.cat(gathered_preds, dim=0)
+        else:
+            dist.gather(preds, None, dst=0)
+    
+    return avg_loss, preds
 
 
 def objective(trial, num_epochs=10):
@@ -130,46 +181,74 @@ def objective(trial, num_epochs=10):
 
 
 def main(config):
-    print("Loaded config:", config.as_dict())
+    # Initialize distributed training if available
+    if dist.is_available() and int(os.environ.get("WORLD_SIZE", 1)) > 1:
+        initialize_ddp()
+    
+    # Print config only on main process
+    if is_main_process():
+        print("Loaded config:", config.as_dict())
+    
     set_seed(config.get("training.seed", 42))
-    device = torch.device(config.get("training.device", "cpu"))
-    config.config["device"] = device
-    if not config.get("data", {}).get("skip_preprocess", False):
-        print("Starting preprocessing...")
-        preprocess_data(config)
-        print("Preprocessing done.")
+    
+    # Set device based on DDP or single GPU
+    if is_distributed_training():
+        device = torch.device(f"cuda:{get_rank()}")
     else:
-        print("Skipping preprocessing.")
+        device = torch.device(config.get("training.device", "cpu"))
+    
+    config.config["device"] = device
+    
+    if is_main_process():
+        if not config.get("data", {}).get("skip_preprocess", False):
+            print("Starting preprocessing...")
+            preprocess_data(config)
+            print("Preprocessing done.")
+        else:
+            print("Skipping preprocessing.")
+    
+    # Synchronize after preprocessing
+    if is_distributed_training():
+        synchronize()
+    
     two_channel_split = config.get("data.split_channels", False)
-
     transform = ROW_SPLIT_TRANSFORM if two_channel_split else BASIC_TRANSFORM
+    
     train_loader, val_loader = get_dataloaders(
-        config, val_split=0.1, transform=transform
+        config, val_split=0.1, transform=transform, use_ddp=is_distributed_training()
     )
-    print("Data loaders ready.")
+    
+    if is_main_process():
+        print("Data loaders ready.")
 
     model = get_model(config).to(device)
     
-    # Enable multi-GPU support if available
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs for data parallelism")
-        model = torch.nn.DataParallel(model)
+    # Wrap model in DistributedDataParallel if distributed training
+    if is_distributed_training():
+        if is_main_process():
+            print(f"Using {get_world_size()} GPUs for distributed training")
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[get_rank()], output_device=get_rank()
+        )
     else:
-        print("Using single GPU/CPU")
+        if is_main_process():
+            print("Using single GPU/CPU")
     
-    print(f"Model '{config.get('model.name', 'unet')}' initialized.")
+    if is_main_process():
+        print(f"Model '{config.get('model.name', 'unet')}' initialized.")
 
     # Load checkpoint if available and not training from scratch
     model_path = config.get("training.model_out", "./best_model.pth")
     if not config.get("training.from_scratch", False) and os.path.exists(model_path):
-        print(f"Loading model weights from checkpoint: {model_path}")
+        if is_main_process():
+            print(f"Loading model weights from checkpoint: {model_path}")
         checkpoint = torch.load(model_path, map_location=device)
-        # Handle loading checkpoints from both DataParallel and single-GPU models
+        # Handle loading checkpoints from both DDP and single-GPU models
         try:
             model.load_state_dict(checkpoint)
         except RuntimeError:
-            # If model is wrapped in DataParallel, adapt checkpoint keys
-            if isinstance(model, torch.nn.DataParallel):
+            # If model is wrapped in DDP, adapt checkpoint keys
+            if isinstance(model, torch.nn.parallel.DistributedDataParallel):
                 new_state_dict = {f'module.{k}': v for k, v in checkpoint.items() if not k.startswith('module.')}
                 if new_state_dict:
                     model.load_state_dict(new_state_dict)
@@ -178,7 +257,8 @@ def main(config):
             else:
                 raise
     else:
-        print("Training from scratch (no checkpoint loaded).")
+        if is_main_process():
+            print("Training from scratch (no checkpoint loaded).")
 
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.get("training.lr", 1e-4))
@@ -191,47 +271,52 @@ def main(config):
     best_val_loss = float("inf")
     best_preds = None
 
-    mlflow.start_run(run_name=f"train-{config.get('model.name')}-{int(time.time())}", tags={"model": config.get("model.name"), "data": config.get("data.input_dir")})
-    mlflow.log_params(
-        {
-            "lr": config.get("training.lr", 1e-4),
-            "batch_size": config.get("training.batch_size", 16),
-            "epochs": num_epochs,
-            "model": config.get("model.name", "unet"),
-            "channels": config.get("model.params.channels", 16),
-            "layers": config.get("model.params.layers", 7),
-        }
-    )
+    # Only start MLflow run on main process
+    if is_main_process():
+        mlflow.start_run(run_name=f"train-{config.get('model.name')}-{int(time.time())}", tags={"model": config.get("model.name"), "data": config.get("data.input_dir")})
+        mlflow.log_params(
+            {
+                "lr": config.get("training.lr", 1e-4),
+                "batch_size": config.get("training.batch_size", 16),
+                "epochs": num_epochs,
+                "model": config.get("model.name", "unet"),
+                "channels": config.get("model.params.channels", 16),
+                "layers": config.get("model.params.layers", 7),
+                "num_gpus": get_world_size(),
+            }
+        )
 
     for epoch in range(num_epochs):
-        print(f"Epoch {epoch+1}/{num_epochs} starting...")
+        if is_main_process():
+            print(f"Epoch {epoch+1}/{num_epochs} starting...")
 
-        train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
+        train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device, epoch=epoch)
         val_loss, preds = validate(model, val_loader, criterion, device)
         scheduler.step()
 
-        print(
-            f"Epoch {epoch+1}/{num_epochs} | Train Loss: {train_loss:.4f} | "
-            f"Val Loss: {val_loss:.4f} | "
-            f"RMSE in DB: {rmse_to_dB(np.sqrt(val_loss)):.6f}"
-        )
-        mlflow.log_metrics({"train_loss": train_loss, "val_loss": val_loss}, step=epoch)
-
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            best_preds = preds
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            # Save properly whether model is wrapped in DataParallel or not
-            model_state = model.module.state_dict() if isinstance(model, torch.nn.DataParallel) else model.state_dict()
-            torch.save(model_state, model_path)
-            torch.save(model_state, model_path.replace('.pth', f'_epoch{epoch+1}.pth'))
-            mlflow.log_artifact(model_path, artifact_path="models")
+        if is_main_process():
             print(
-                f"New best model saved at epoch {epoch+1} with val loss {val_loss:.4f}"
+                f"Epoch {epoch+1}/{num_epochs} | Train Loss: {train_loss:.4f} | "
+                f"Val Loss: {val_loss:.4f} | "
+                f"RMSE in DB: {rmse_to_dB(np.sqrt(val_loss)):.6f}"
             )
+            mlflow.log_metrics({"train_loss": train_loss, "val_loss": val_loss}, step=epoch)
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_preds = preds
+                os.makedirs(os.path.dirname(model_path), exist_ok=True)
+                # Save properly whether model is wrapped in DDP or not
+                model_state = model.module.state_dict() if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model.state_dict()
+                torch.save(model_state, model_path)
+                torch.save(model_state, model_path.replace('.pth', f'_epoch{epoch+1}.pth'))
+                mlflow.log_artifact(model_path, artifact_path="models")
+                print(
+                    f"New best model saved at epoch {epoch+1} with val loss {val_loss:.4f}"
+                )
         
 
-    if best_preds is not None:
+    if best_preds is not None and is_main_process():
         print("Postprocessing and plotting best predictions...")
         postprocess_and_plot(
             best_preds, config, save_dir=config.get("output.wrap_pred_dir"), show=True
@@ -242,7 +327,14 @@ def main(config):
         os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
         if os.path.exists(metrics_path):
             mlflow.log_artifact(metrics_path, artifact_path="metrics")
-    mlflow.end_run()
+    
+    # End MLflow run on main process
+    if is_main_process():
+        mlflow.end_run()
+    
+    # Clean up distributed training
+    if is_distributed_training():
+        cleanup_ddp()
 
 
 if __name__ == "__main__":
