@@ -116,9 +116,11 @@ def validate(model, loader, criterion, device):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = model(inputs)
             val_loss += criterion(outputs, targets).item()
-            preds.append(outputs.cpu())
+            # Keep predictions on GPU for DDP gathering
+            preds.append(outputs)
     
-    preds = torch.cat(preds, dim=0) if preds else torch.tensor([])
+    # Concatenate predictions (still on GPU if distributed)
+    preds = torch.cat(preds, dim=0) if preds else torch.tensor([]).to(device)
     
     # Synchronize validation loss across all processes
     avg_loss = val_loss / len(loader)
@@ -127,14 +129,20 @@ def validate(model, loader, criterion, device):
         dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
         avg_loss = (loss_tensor.item() / get_world_size())
         
-        # Gather all predictions on rank 0
+        # Gather all predictions on rank 0 (keep on GPU during gather)
         world_size = get_world_size()
         if get_rank() == 0:
             gathered_preds = [torch.zeros_like(preds) for _ in range(world_size)]
             dist.gather(preds, gathered_preds, dst=0)
-            preds = torch.cat(gathered_preds, dim=0)
+            # Concatenate and move to CPU after gathering
+            preds = torch.cat(gathered_preds, dim=0).cpu()
         else:
             dist.gather(preds, None, dst=0)
+            # Non-main processes can clear predictions to save memory
+            preds = torch.tensor([])
+    else:
+        # Move to CPU for single GPU case
+        preds = preds.cpu()
     
     return avg_loss, preds
 
