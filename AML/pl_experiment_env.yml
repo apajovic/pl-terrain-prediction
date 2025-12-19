@@ -1,0 +1,24 @@
+name: pl_experiment_env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip=23.1.2
+  - pip:
+      - torch
+      - torchvision
+      - numpy
+      - matplotlib
+      - scikit-image
+      - scipy
+      - pyyaml
+      - pillow
+      - optuna
+      - tqdm
+      - mlflow
+      - azureml-mlflow
+      - azure-ai-ml
+      - azure-core
+      - azure-identity
+      - azureml-core

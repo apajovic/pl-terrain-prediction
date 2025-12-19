@@ -11,9 +11,35 @@
             "program": "src/python/train.py",
             "args": [
                 "--config",
-                "configs/tiny_vit.json",
+                "configs/unet-2chan.json",
               
               
+            ],
+            "console": "integratedTerminal"
+        }, 
+        {
+            "name": "Evaluate",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/python/evaluate.py",
+            "args": [
+                "--config",
+                "configs/unet-2chan.json",
+              
+              
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Preproc",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/python/preprocess.py",
+            "args": [
+                "--input_dir", "./data/v3/gainMap/",
+                "--output_dir", "./data/v3/gainMap_unwrap",
+                "--base_img_path", "./data/v3/distanceMap/",
+                "--statify",
             ],
             "console": "integratedTerminal"
         }

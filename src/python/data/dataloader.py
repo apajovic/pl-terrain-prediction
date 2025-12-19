@@ -31,7 +31,7 @@ class RowAverageSplitTransform:
             img_tensor = 0.299 * img_tensor[0] + 0.587 * img_tensor[1] + 0.114 * img_tensor[2]
         
         # Calculate row averages
-        row_averages = img_tensor.mean(dim=1, keepdim=True)  # Average across columns for each row
+        row_averages = img_tensor.min(dim=1, keepdim=True).values  # Max across columns for each row
         
         # Create row-averaged image (same value across each row)
         row_avg_image = row_averages.expand_as(img_tensor)  # Broadcast to full image size
@@ -92,6 +92,7 @@ class ImageToImageDataset(Dataset):
         self.target_filenames = sorted([
             f for f in os.listdir(target_dir) if f.endswith('.png')
         ])
+        print(self.input_filenames[:10], self.target_filenames[:10])
 
     def __len__(self):
         return len(self.input_filenames)

@@ -1,6 +1,7 @@
 {
   "data": {
     "skip_preprocess": true,
+    "split_channels": false,
     "input_dir": "./data/ter_unwrap",
     "target_dir": "./data/PL_unwrap_orig",
     "unwrap_dir": "./output/ter_unwrap",

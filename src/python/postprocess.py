@@ -54,7 +54,7 @@ def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, is_tens
     for i in tqdm(range(images.shape[0]), desc='Wrapping images'):
         unwrap_img = np.squeeze(images[i, :, :])
         center = (unwrap_img.shape[0] / 2, unwrap_img.shape[1] / 2)
-        wrp_img = radial_wrap(unwrap_img, img_size, center)
+        wrp_img = unwrap_img#radial_wrap(unwrap_img, img_size, center)
         
         wrp_img = wrp_img * 255 if is_tensor else wrp_img
         wrp_img = wrp_img.astype(np.uint8)

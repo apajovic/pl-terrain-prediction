@@ -1,0 +1,35 @@
+{
+  "data": {
+    "skip_preprocess": true,
+    "input_dir": "./data/v3/buildingMap",
+    "target_dir": "./data/v3/gainMap",
+    "unwrap_dir": "./data/v3/buildingMap_unwrap",
+    "wrap_dir": "./data/v3/buildingMap_wrap",
+    "num_angles": 256,
+    "num_radii": 256,
+    "base_name": ""
+  },
+  "model": {
+    "name": "transunet"
+  },
+  "training": {
+    "batch_size": 4,
+    "seed": 42,
+    "device": "cuda",
+    "lr": 0.0001,
+    "lr_step": 130,
+    "lr_gamma": 0.1,
+    "epochs": 250,
+    "n_trials": 10,
+    "model_out": "/home/acap/faks/pl-terrain-prediction/output/transunet-rt-no-unwrapping/transunet-rt-no-unwrapping.pth"
+  },
+  "evaluation": {
+    "path_from_mlflow": false,
+    "model_path": "/home/acap/faks/pl-terrain-prediction/output/transunet-rt-no-unwrapping/transunet-rt-no-unwrapping.pth"
+  },
+  "output": {
+    "metrics_out": "/home/acap/faks/pl-terrain-prediction/output/transunet-rt-no-unwrapping/metrics.txt",
+    "wrap_pred_dir": "/home/acap/faks/pl-terrain-prediction/output/transunet-rt-no-unwrapping/predictions",
+    "wrap_targets_dir": "/home/acap/faks/pl-terrain-prediction/output/transunet-rt-no-unwrapping/targets"
+  }
+}

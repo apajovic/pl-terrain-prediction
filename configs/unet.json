@@ -10,7 +10,8 @@
     "base_name": "PL"
   },
   "model": {
-    "name": "unet"
+    "name": "unet",
+    "num_output_channels": 1
   },
   "training": {
     "batch_size": 16,

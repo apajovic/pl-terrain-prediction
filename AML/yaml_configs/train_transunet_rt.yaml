@@ -1,0 +1,28 @@
+aml_config: playground_env.yaml
+experiment_name: pl_experiment
+display_name: train_transunet_rt
+cmd_line: >
+  python src/python/train.py \
+    --config configs/transunet-rt.json
+
+# Optional: Set job priority (low, medium, high)
+# priority: "medium"  # Uncomment to set priority
+
+input_data:
+  - name: training_data
+    data_asset:
+      name: pl-experiment-data
+      version: "latest"
+    blob_folder: null
+
+output_data:
+  - name: model_output
+    data_asset: null
+    blob_folder: null
+
+environment_name: pl_experiment_env
+compute_cluster: gpu-cluster
+shared_memory: 12g
+docker_container_base: mcr.microsoft.com/azureml/openmpi4.1.0-cuda11.1-cudnn8-ubuntu20.04
+aml_env_path: AML/pl_experiment_env.yml
+instance_count: 1

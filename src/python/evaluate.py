@@ -9,6 +9,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from postprocess import postprocess
+from metrics import rmse_to_dB
 from models import get_model
 import mlflow
 import tqdm
@@ -19,7 +20,7 @@ from skimage.io import imshow
 def normalize_tensor(tensor):
     return (tensor - tensor.min()) / (tensor.max() - tensor.min()) 
 
-def evaluate(config):
+def evaluate(config, evaluation_samples=10, skip_wrapping=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = get_model(config).to(device)
     # Load weights
@@ -44,7 +45,7 @@ def evaluate(config):
     two_channel_split = config.get('data.split_channels', False)
     
     transform = ROW_SPLIT_TRANSFORM if two_channel_split else BASIC_TRANSFORM
-    _, test_loader = get_dataloaders(config, transform=transform, val_split=0.01)
+    _, test_loader = get_dataloaders(config, transform=transform, val_split=0.1)
     
     with torch.no_grad():
         for inputs, targs in tqdm.tqdm(test_loader, total=len(test_loader)):
@@ -58,15 +59,21 @@ def evaluate(config):
             num_batches += 1
             preds.append(outputs.cpu())
             targets.append(targs.cpu())
+            if num_batches > evaluation_samples:
+                break
     preds = torch.cat(preds, dim=0)
     targets = torch.cat(targets, dim=0)
     # Compute MSE
     mse = torch.nn.functional.mse_loss(preds, targets).item()
-    print(f"Test MSE: {mse:.6f}")
-
+    print(f"Test RMSE: {np.sqrt(mse):.6f}")
+    print(f"Test RMSE in dB: {rmse_to_dB(np.sqrt(mse)):.6f}")
+    
+    batch_size = config.get('training.batch_size', 16)
     avg_pred_time = total_pred_time / num_batches if num_batches > 0 else 0.0
+    avg_pred_time_per_sample = avg_pred_time / batch_size if batch_size > 0 else 0.0
     print(f"Total prediction time: {total_pred_time:.4f} s")
     print(f"Average prediction time per batch: {avg_pred_time:.6f} s")
+    print(f"Average prediction time per sample: {avg_pred_time_per_sample:.6f} s")
 
     mlflow.start_run(run_name="evaluate")
     mlflow.log_params({
@@ -105,6 +112,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', default='default_config.json', help='Path to configuration file')
+    parser.add_argument('--skip_wrapping', action='store_true', help='Skip the wrapping step in postprocessing')
+    parser.add_argument('--evaluation_samples', type=int, default=10, help='Number of batches to evaluate')
     args = parser.parse_args()
     config = get_config(args.config)
-    evaluate(config)
+    evaluate(config, skip_wrapping=args.skip_wrapping, evaluation_samples=args.evaluation_samples)

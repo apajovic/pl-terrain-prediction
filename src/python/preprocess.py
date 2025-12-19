@@ -16,27 +16,29 @@ def preprocess_data(config):
         config.get('data.num_angles', 256),
         config.get('data.num_radii', 256),
         (256, 256),
-        config.get('data.make_static', 'PL')
+        config.get('data.make_static', 'PL'), 
+        config.get('data.base_img_path', "data/base/out_unwrapped/no_obstacle_unwrapped.png")
     )
 
 def normalize_img(img):
-    return (img - np.mean(img)) / np.std(img)
+    return (img - np.min(img)) / (np.max(img) - np.min(img)) * 255
 def make_static(image, base):
     return np.clip(normalize_img(image) - normalize_img(base), a_min=0, a_max=255)
-    
+def make_static_default(image, base):
+    return np.clip(image - base, a_min=0, a_max=255)
     
 def process_single_image(file_name, input_dir, output_dir, num_angles, num_radii, img_size, statify, base_img_path):
     full_path = os.path.join(input_dir, file_name)
     img = imread(full_path)
 
     center = (img.shape[0] / 2, img.shape[1] / 2)
-    unwrap_img_ = radial_unwrap(img, num_angles, num_radii, center)
-
     if statify:
         base_img = imread(base_img_path)
         if base_img.shape != img.shape:
             base_img = resize(base_img, img_size, order=1, preserve_range=True).astype(np.uint8)
-        img = make_static(img, base_img)
+        img = make_static_default(img, base_img)
+    
+    unwrap_img_ = radial_unwrap(img, num_angles, num_radii, center)
 
     out_img_name = f"{file_name.split('.')[0]}_unwrap.png"
     fileName = os.path.join(output_dir, out_img_name)
@@ -59,10 +61,13 @@ def unwrap_img(input_dir, output_dir, num_angles, num_radii, img_size, statify=F
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     file_list = sorted([f for f in os.listdir(input_dir) if f.endswith('.png')])
+    
 
     Parallel(n_jobs=n_jobs)(
         delayed(process_single_image)(
-            file_name, input_dir, output_dir, num_angles, num_radii, img_size, statify, base_img_path
+            file_name, input_dir, output_dir, num_angles,
+            num_radii, img_size, statify,
+            base_img_path=base_img_path if os.path.isfile(base_img_path) else base_img_path + file_name
         ) for file_name in tqdm(file_list)
     )
 
@@ -125,6 +130,10 @@ if __name__ == '__main__':
                         help='Size of the output images (height, width)')
     parser.add_argument('--statify', action="store_true", 
                         help='Size of the output images (height, width)')
+    parser.add_argument('--base_img_path', type=str, default="data/base/out_unwrapped/no_obstacle_unwrapped.png",
+                        help='Path to the base image for making static images')
     args= parser.parse_args()
-    unwrap_img(args.input_dir, args.output_dir, args.num_angles, args.num_radii, args.img_size, args.statify)
-    
+    unwrap_img(args.input_dir, args.output_dir,
+               args.num_angles, args.num_radii,
+               args.img_size, args.statify,
+               args.base_img_path)
