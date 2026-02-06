@@ -23,6 +23,12 @@ def get_model(config):
         import numpy as np
         net =  TransUNet(config=CONFIGS['ViT-SMOL'])
         return net
+    elif model_name == 'transunet-r50':
+        from .transunet import VisionTransformer as TransUNet
+        from .transunet import CONFIGS
+        import numpy as np
+        net =  TransUNet(config=CONFIGS['R50-ViT-B_16'])
+        return net
     elif model_name == 'tiny_vit':
         from .tiny_vit import TinyViT, tiny_vit_5m_256
         import numpy as np

@@ -35,7 +35,7 @@ def postprocess(output, config, save_dir=None, show=True, is_tensor=True):
         config.get('base_name', 'model_pred'),
         is_tensor=is_tensor
     )
-    
+
     return wrapped
 
 
@@ -55,7 +55,7 @@ def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, is_tens
         unwrap_img = np.squeeze(images[i, :, :])
         center = (unwrap_img.shape[0] / 2, unwrap_img.shape[1] / 2)
         wrp_img = unwrap_img#radial_wrap(unwrap_img, img_size, center)
-        
+
         wrp_img = wrp_img * 255 if is_tensor else wrp_img
         wrp_img = wrp_img.astype(np.uint8)
         output_image_name = os.path.join(out_dir, f"{base_name}_wrap{i+1:03d}.png")
@@ -64,7 +64,7 @@ def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, is_tens
             wrp_img, (256, 256), order=1, preserve_range=True
         ).astype(np.uint8)
         imsave(output_image_name, img_res)
-        
+
     return wrap_img_tensor
 
 

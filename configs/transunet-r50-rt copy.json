@@ -10,7 +10,7 @@
     "base_name": ""
   },
   "model": {
-    "name": "transunet"
+    "name": "transunet-r50"
   },
   "training": {
     "batch_size": 32,

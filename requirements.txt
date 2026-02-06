@@ -8,3 +8,5 @@ pyyaml
 pillow
 optuna
 azureml-core
+mlflow
+ml_collections

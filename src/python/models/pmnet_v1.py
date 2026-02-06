@@ -156,7 +156,7 @@ class PMNet(nn.Module):
         multi_grids = config.get('model.params.multi_grids', [1, 2, 4])
         input_channels = config.get('model.params.input_channels', 1)
 
-            
+
         if output_stride == 8:
             s = [1, 2, 1, 1]
             d = [1, 1, 2, 4]
@@ -208,7 +208,7 @@ class PMNet(nn.Module):
         xup5 = self.conv_up5(x8)
         if xup5.shape[2:] != x5.shape[2:]:
             xup5 = F.interpolate(xup5, size=x5.shape[2:], mode="bilinear", align_corners=False)
-        
+
         xup5 = torch.cat([xup5, x5], dim=1)
         xup4 = self.conv_up4(xup5)
         if xup4.shape[2:] != x4.shape[2:]:
@@ -231,6 +231,6 @@ class PMNet(nn.Module):
         xup0 = F.interpolate(xup0, size=x.shape[2:], mode="bilinear", align_corners=False)
         xup0 = torch.cat([xup0, x], dim=1)
         xup00 = self.conv_up00(xup0)
-        
+
         return xup00
 

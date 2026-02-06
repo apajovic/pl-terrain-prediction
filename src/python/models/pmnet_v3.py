@@ -152,11 +152,11 @@ class PMNet(nn.Module):
 
     def __init__(self, config=None):
         super(PMNet, self).__init__()
-        
+
         n_blocks = config.get('model.params.n_blocks', [3, 3, 27, 3])
-        atrous_rates = config.get('model.params.atrous_rates', [6, 12, 18])
+        output_stride = config.get('model.params.output_stride', 16)
+        atrous_rates = config.get('model.params.atrous_rates',[6, 12, 18])
         multi_grids = config.get('model.params.multi_grids', [1, 2, 4])
-        output_stride = config.get('model.params.output_stride', 8)
         input_channels = config.get('model.params.input_channels', 1)
         output_channels = config.get('model.params.output_channels', 1)
 
@@ -238,6 +238,6 @@ class PMNet(nn.Module):
         xup0 = F.interpolate(xup0, size=x.shape[2:], mode="bilinear", align_corners=False)
         xup0 = torch.cat([xup0, x], dim=1)
         xup00 = self.conv_up00(xup0)
-        
+
         return xup00
 

@@ -49,7 +49,7 @@ def postprocess_and_plot(pred_tensor, config, save_dir=None, show=True):
         pred_np,
         (256, 256),
         config.get("data.base_name", "PL_pred"),
-        indikator=True,
+        is_tensor=True,
     )
     for i in range(min(4, wrapped.shape[-1])):
         plt.imshow(wrapped[:, :, i], cmap="gray")

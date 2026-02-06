@@ -39,7 +39,7 @@ def get_smol_config():
     config.patches = ml_collections.ConfigDict({'size': (16, 16)})
     config.hidden_size = 768
     config.n_skip = 0
-    
+
     config.transformer = ml_collections.ConfigDict()
     config.transformer.mlp_dim = 1536
     config.transformer.num_heads = 8
@@ -63,7 +63,7 @@ def get_b16_config():
     config.patches = ml_collections.ConfigDict({'size': (16, 16)})
     config.hidden_size = 768
     config.n_skip = 0
-    
+
     config.transformer = ml_collections.ConfigDict()
     config.transformer.mlp_dim = 3072
     config.transformer.num_heads = 12
@@ -111,7 +111,7 @@ def get_r50_b16_config():
     config.pretrained_path = '../model/vit_checkpoint/imagenet21k/R50+ViT-B_16.npz'
     config.decoder_channels = (256, 128, 64, 16)
     config.skip_channels = [512, 256, 64, 16]
-    config.n_classes = 2
+    config.n_classes = 1
     config.n_skip = 3
     config.activation = 'softmax'
 
@@ -468,7 +468,7 @@ class Embeddings(nn.Module):
             grid_size = config.patches["grid"]
             patch_size = (img_size[0] // 16 // grid_size[0], img_size[1] // 16 // grid_size[1])
             patch_size_real = (patch_size[0] * 16, patch_size[1] * 16)
-            n_patches = (img_size[0] // patch_size_real[0]) * (img_size[1] // patch_size_real[1])  
+            n_patches = (img_size[0] // patch_size_real[0]) * (img_size[1] // patch_size_real[1])
             self.hybrid = True
         else:
             patch_size = _pair(config.patches["size"])
@@ -701,7 +701,7 @@ class DecoderCup(nn.Module):
                 skip = None
             x = decoder_block(x, skip=skip)
         return x
-    
+
 class DecoderCupTiny(nn.Module):
     def __init__(self, config):
         super().__init__()

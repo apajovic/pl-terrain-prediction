@@ -21,15 +21,15 @@
     "lr_gamma": 0.1,
     "epochs": 100,
     "n_trials": 10,
-    "model_out": "/home/acap/faks/pl-terrain-prediction/output/tiny_vit/tiny_vit.pth"
+    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/tiny_vit/tiny_vit.pth"
   },
   "evaluation": {
     "path_from_mlflow": false,
-    "model_path": "/home/acap/faks/pl-terrain-prediction/output/tiny_vit/tiny_vit.pth"
+    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/tiny_vit/tiny_vit.pth"
   },
   "output": {
-    "metrics_out": "/home/acap/faks/pl-terrain-prediction/output/tiny_vit/metrics.txt",
-    "wrap_pred_dir": "/home/acap/faks/pl-terrain-prediction/output/tiny_vit/predictions",
-    "wrap_targets_dir": "/home/acap/faks/pl-terrain-prediction/output/tiny_vit/targets"
+    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/tiny_vit/metrics.txt",
+    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/tiny_vit/predictions",
+    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/tiny_vit/targets"
   }
 }
