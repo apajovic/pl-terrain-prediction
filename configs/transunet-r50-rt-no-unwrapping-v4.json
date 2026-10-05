@@ -5,8 +5,8 @@
     "target_dir": "./data/v4/RadioMap3DSeer_padded/train_dataset/gainMapPadded",
     "unwrap_dir": "./data/v4/RadioMap3DSeer_padded/train_dataset/buildingMapPadded_unwrap",
     "wrap_dir": "./data/v4/RadioMap3DSeer_padded/train_dataset/buildingMapPadded_wrap",
-    "num_angles": 256,
-    "num_radii": 256,
+    "num_angles": 896,
+    "num_radii": 896,
     "base_name": ""
   },
   "model": {

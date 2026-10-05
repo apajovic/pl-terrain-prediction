@@ -9,3 +9,8 @@ mlruns
 
 pat.txt
 src/python/models/pretrained
+mamba
+nohup.out
+*.db
+*.png
+

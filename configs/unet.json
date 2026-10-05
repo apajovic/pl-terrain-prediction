@@ -5,8 +5,8 @@
     "unwrap_dir": "./data/v2/teren_unwrap_all",
     "input_dir": "./data/v2/teren_unwrap_all",
     "target_dir": "./data/v2/pl_all_unwrapped",
-    "num_angles": 256,
-    "num_radii": 256,
+    "num_angles": 896,
+    "num_radii": 896,
     "base_name": "PL"
   },
   "model": {

@@ -1,0 +1,42 @@
+{
+  "data": {
+    "skip_preprocess": true,
+    "input_dir": "./data/v3/buildingMap_unwrap_256",
+    "target_dir": "./data/v3/gainMap_unwrap_256",
+    "original_buildings": "./data/v3/buildingMap",
+    "original_gain": "./data/v3/gainMap",
+    "num_angles": 896,
+    "num_radii": 896,
+    "base_name": ""
+  },
+  "wrap": true,
+  "model": {
+    "name": "transunet-b32"
+  },
+  "training": {
+    "batch_size": 8,
+    "seed": 42,
+    "device": "cuda",
+    "lr": 0.0003,
+    "lr_step": 130,
+    "lr_gamma": 0.1,
+    "epochs": 150,
+    "n_trials": 10,
+    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-b32-rt/transunet-b32-rt.pth",
+    "num_workers": 0,
+    "ddp": {
+      "enabled": true,
+      "backend": "nccl",
+      "find_unused_parameters": false
+    }
+  },
+  "evaluation": {
+    "path_from_mlflow": false,
+    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-b32-rt/transunet-b32-rt.pth"
+  },
+  "output": {
+    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-b32-rt/metrics.txt",
+    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-b32-rt/predictions",
+    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-b32-rt/targets"
+  }
+}

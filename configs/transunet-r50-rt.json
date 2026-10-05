@@ -3,26 +3,27 @@
     "skip_preprocess": true,
     "input_dir": "./data/v3/buildingMap_unwrap",
     "target_dir": "./data/v3/gainMap_unwrap",
-    "unwrap_dir": "./data/v3/buildingMap_unwrap",
-    "wrap_dir": "./data/v3/buildingMap_unwrap",
-    "num_angles": 256,
-    "num_radii": 256,
+    "original_buildings": "./data/v3/buildingMap",
+    "original_gain": "./data/v3/gainMap",
+    "num_angles": 896,
+    "num_radii": 896,
     "base_name": ""
   },
+  "wrap": true,
   "model": {
     "name": "transunet-r50"
   },
   "training": {
-    "batch_size": 32,
+    "batch_size": 8,
     "seed": 42,
     "device": "cuda",
     "lr": 0.0003,
     "lr_step": 130,
     "lr_gamma": 0.1,
-    "epochs": 150,
+    "epochs": 10,
     "n_trials": 10,
-    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-rt/transunet-rt.pth",
-    "num_workers": 2,
+    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt/transunet-r50-rt.pth",
+    "num_workers": 0,
     "ddp": {
       "enabled": true,
       "backend": "nccl",
@@ -31,11 +32,11 @@
   },
   "evaluation": {
     "path_from_mlflow": false,
-    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-rt/transunet-rt.pth"
+    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt/transunet-r50-rt.pth"
   },
   "output": {
-    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-rt/metrics.txt",
-    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-rt/predictions",
-    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-rt/targets"
+    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt/metrics.txt",
+    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt/predictions",
+    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt/targets"
   }
 }

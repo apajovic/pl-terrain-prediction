@@ -154,10 +154,11 @@ class PMNet(nn.Module):
         super(PMNet, self).__init__()
 
         n_blocks = config.get('model.params.n_blocks', [3, 3, 27, 3])
-        output_stride = config.get('model.params.output_stride', 16)
+        output_stride = config.get('model.params.output_stride', 8)
         atrous_rates = config.get('model.params.atrous_rates',[6, 12, 18])
         multi_grids = config.get('model.params.multi_grids', [1, 2, 4])
-        input_channels = config.get('model.params.input_channels', 1)
+        input_channels = config.get('model.params.input_channels', 2)
+        self.input_channels = input_channels
         output_channels = config.get('model.params.output_channels', 1)
 
         if output_stride == 8:
@@ -188,7 +189,7 @@ class PMNet(nn.Module):
 
         self.conv_up0 = ConRu(256+64, 128, 3, 1)
         self.conv_up00 = nn.Sequential(
-                         nn.Conv2d(128+output_channels, 64, kernel_size=3, padding=1),#nn.Conv2d(128+2, 64, kernel_size=3, padding=1),
+                         nn.Conv2d(127+input_channels+output_channels, 64, kernel_size=3, padding=1),#nn.Conv2d(128+2, 64, kernel_size=3, padding=1),
                          nn.BatchNorm2d(64),
                          nn.ReLU(),
                          nn.Conv2d(64, 64, kernel_size=3, padding=1),
@@ -221,7 +222,7 @@ class PMNet(nn.Module):
 
         xup3 = self.conv_up3(xup4)
         if xup3.shape[2:] != x3.shape[2:]:
-            xup3 = F.interpolate(xup3, size=x3.shape[2:], mode="bilinear", align_corners=False)
+          xup3 = F.interpolate(xup3, size=x3.shape[2:], mode="bilinear", align_corners=False)
         xup3 = torch.cat([xup3, x3], dim=1)
 
         xup2 = self.conv_up2(xup3)

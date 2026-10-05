@@ -3,10 +3,10 @@
     "skip_preprocess": true,
     "input_dir": "./data/v3/buildingMap",
     "target_dir": "./data/v3/gainMap",
-    "unwrap_dir": "./data/v3/buildingMap_unwrap",
-    "wrap_dir": "./data/v3/buildingMap_wrap",
-    "num_angles": 256,
-    "num_radii": 256,
+    "original_buildings": "./data/v3/buildingMap",
+    "original_gain": "./data/v3/gainMap",
+    "num_angles": 896,
+    "num_radii": 896,
     "base_name": ""
   },
   "model": {
@@ -19,9 +19,9 @@
     "lr": 0.0003,
     "lr_step": 130,
     "lr_gamma": 0.1,
-    "epochs": 50,
+    "epochs": 10,
     "n_trials": 10,
-    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping-v4/transunet-r50-rt-no-unwrapping-v4.pth",
+    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping/transunet-r50-rt-no-unwrapping.pth",
     "num_workers": 2,
     "ddp": {
       "enabled": true,
@@ -31,11 +31,11 @@
   },
   "evaluation": {
     "path_from_mlflow": false,
-    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping-v4/transunet-r50-rt-no-unwrapping-v4.pth"
+    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping/transunet-r50-rt-no-unwrapping.pth"
   },
   "output": {
-    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping-v4/metrics.txt",
-    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping-v4/predictions",
-    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping-v4/targets"
+    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping/metrics.txt",
+    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping/predictions",
+    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/transunet-r50-rt-no-unwrapping/targets"
   }
 }

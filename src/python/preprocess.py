@@ -91,10 +91,10 @@ def apply_circular_mask(img):
     return masked_img
 
 
-def radial_unwrap(img, num_angles, num_radii, center):
+def radial_unwrap(img, num_angles, num_radii, center, method='nearest'):
     """
     Transform image from polar coordinates to rectangular form.
-    Optimized for speed by vectorizing coordinate generation and interpolation.
+    Uses selectable nearest-neighbor or linear sampling.
     """
     theta = np.linspace(0, 2 * np.pi, num_angles, endpoint=False)
     max_r = min(
@@ -105,7 +105,9 @@ def radial_unwrap(img, num_angles, num_radii, center):
     img = img.astype(float)
     y = np.arange(img.shape[0])
     x = np.arange(img.shape[1])
-    interpolator = RegularGridInterpolator((y, x), img, bounds_error=False, fill_value=0)
+    interpolator = RegularGridInterpolator(
+        (y, x), img, method=method, bounds_error=False, fill_value=0
+    )
 
     # Vectorized meshgrid for all (r, theta) pairs
     rr, tt = np.meshgrid(r, theta, indexing='ij')

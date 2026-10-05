@@ -3,10 +3,10 @@
     "skip_preprocess": true,
     "input_dir": "./data/v3/buildingMap",
     "target_dir": "./data/v3/gainMap",
-    "unwrap_dir": "./data/v3/buildingMap_unwrap",
-    "wrap_dir": "./data/v3/buildingMap_wrap",
-    "num_angles": 256,
-    "num_radii": 256,
+    "original_buildings": "./data/v3/buildingMap",
+    "original_gain": "./data/v3/gainMap",
+    "num_angles": 896,
+    "num_radii": 896,
     "base_name": ""
   },
   "model": {

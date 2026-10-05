@@ -6,8 +6,8 @@
     "target_dir": "./data/PL_unwrap_orig",
     "unwrap_dir": "./output/ter_unwrap",
     "wrap_dir": "./data/ter_wrap",
-    "num_angles": 256,
-    "num_radii": 256,
+    "num_angles": 896,
+    "num_radii": 896,
     "base_name": "PL"
   },
   "model": {

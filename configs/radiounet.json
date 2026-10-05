@@ -11,7 +11,7 @@
   },
   "wrap": true,
   "model": {
-    "name": "pmnet_v3",
+    "name": "radiounet",
     "params":{
       "input_channels": 1
     }
@@ -24,9 +24,9 @@
     "lr": 0.001,
     "lr_step": 10,
     "lr_gamma": 0.1,
-    "epochs": 10,
+    "epochs": 20,
     "n_trials": 10,
-    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/pmnet_v3/pmnet_v3_.pth",
+    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet/radiounet_.pth",
     "num_workers": 2,
     "ddp": {
       "enabled": true,
@@ -36,11 +36,11 @@
   },
   "evaluation": {
     "path_from_mlflow": false,
-    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/pmnet_v3/pmnet_v3_.pth"
+    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet/radiounet_.pth"
   },
   "output": {
-    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/pmnet_v3/pmnet_v3.txt",
-    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/pmnet_v3/predictions",
-    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/pmnet_v3/targets"
+    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet/radiounet.txt",
+    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet/predictions",
+    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet/targets"
   }
 }

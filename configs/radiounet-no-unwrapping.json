@@ -1,0 +1,44 @@
+{
+  "data": {
+    "skip_preprocess": true,
+    "input_dir": "./data/v3/buildingMap",
+    "target_dir": "./data/v3/gainMap",
+    "original_buildings": "./data/v3/buildingMap",
+    "original_gain": "./data/v3/gainMap",
+    "num_angles": 896,
+    "num_radii": 896,
+    "base_name": ""
+  },
+  "model": {
+    "name": "radiounet",
+    "params":{
+      "input_channels": 1
+    }
+  },
+  "training": {
+    "batch_size": 32,
+    "seed": 42,
+    "device": "cuda",
+    "lr": 0.0003,
+    "lr_step": 130,
+    "lr_gamma": 0.1,
+    "epochs": 20,
+    "n_trials": 10,
+    "model_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet-no-unwrapping/radiounet-no-unwrapping.pth",
+    "num_workers": 2,
+    "ddp": {
+      "enabled": true,
+      "backend": "nccl",
+      "find_unused_parameters": false
+    }
+  },
+  "evaluation": {
+    "path_from_mlflow": false,
+    "model_path": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet-no-unwrapping/radiounet-no-unwrapping.pth"
+  },
+  "output": {
+    "metrics_out": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet-no-unwrapping/metrics.txt",
+    "wrap_pred_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet-no-unwrapping/predictions",
+    "wrap_targets_dir": "/home/aleksandar_pajovic/pl-terrain-prediction/output/radiounet-no-unwrapping/targets"
+  }
+}

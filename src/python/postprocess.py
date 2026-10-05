@@ -9,6 +9,7 @@ from skimage.transform import resize
 from skimage.io import imsave
 from scipy.interpolate import griddata
 from tqdm import tqdm
+import cv2
 
 def postprocess(output, config, save_dir=None, show=True, is_tensor=True):
     """
@@ -33,13 +34,15 @@ def postprocess(output, config, save_dir=None, show=True, is_tensor=True):
         out_dir,
         (256, 256),
         config.get('base_name', 'model_pred'),
-        is_tensor=is_tensor
+        is_tensor=is_tensor,
+        wrap=config.get('wrap', False)
     )
+
 
     return wrapped
 
 
-def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, is_tensor:bool):
+def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, is_tensor:bool, wrap:bool):
     """
     Funkcija koja unwrap slike vraca u originalni radijalni oblik
     out_dir: direktorijum u kojem cemo cuvati kreirane slike
@@ -53,17 +56,22 @@ def wrap_img(images: list, out_dir: str, img_size:tuple , base_name:str, is_tens
     wrap_img_tensor = []
     for i in tqdm(range(images.shape[0]), desc='Wrapping images'):
         unwrap_img = np.squeeze(images[i, :, :])
-        center = (unwrap_img.shape[0] / 2, unwrap_img.shape[1] / 2)
-        wrp_img = unwrap_img#radial_wrap(unwrap_img, img_size, center)
+        wrp_img = unwrap_img
+        if wrap:
+          center = (unwrap_img.shape[0] / 2, unwrap_img.shape[1] / 2)
+          wrp_img = radial_wrap(unwrap_img, img_size, center)
+
 
         wrp_img = wrp_img * 255 if is_tensor else wrp_img
-        wrp_img = wrp_img.astype(np.uint8)
+
+        # wrp_img = wrp_img.astype(np.uint8)
         output_image_name = os.path.join(out_dir, f"{base_name}_wrap{i+1:03d}.png")
 
         img_res = resize(
             wrp_img, (256, 256), order=1, preserve_range=True
         ).astype(np.uint8)
         imsave(output_image_name, img_res)
+        wrap_img_tensor.append(img_res)
 
     return wrap_img_tensor
 
@@ -108,10 +116,33 @@ def radial_wrap_depracated(transformed_img, img_size, center):
     return img
 
 
-def radial_wrap(transformed_img, img_size, center):
+def radial_wrap(transformed_img, img_size, center, method='nearest'):
+    """Map a polar image back to Cartesian space using nearest or linear sampling."""
     num_radii, num_angles = transformed_img.shape
-    theta = np.linspace(0, 2 * np.pi, num_angles, endpoint=False)
     max_r = min(center[0], center[1], img_size[0] - center[0], img_size[1] - center[1])
+
+    if method == 'linear':
+        yy, xx = np.meshgrid(np.arange(img_size[0]), np.arange(img_size[1]), indexing='ij')
+        radius = np.sqrt((xx - center[1]) ** 2 + (yy - center[0]) ** 2)
+        angle = np.mod(np.arctan2(yy - center[0], xx - center[1]), 2 * np.pi)
+        map_x = (angle * num_angles / (2 * np.pi)).astype(np.float32)
+        map_y = (radius * (num_radii - 1) / max_r).astype(np.float32)
+
+        # Duplicate the first angular column so interpolation is continuous at 2*pi.
+        periodic_img = np.concatenate([transformed_img, transformed_img[:, :1]], axis=1)
+        img = cv2.remap(
+            periodic_img.astype(np.float32), map_x, map_y,
+            interpolation=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0,
+        )
+        img[radius > max_r] = 0
+        return img
+
+    if method != 'nearest':
+        raise ValueError(f"Unsupported interpolation method: {method}")
+
+    theta = np.linspace(0, 2 * np.pi, num_angles, endpoint=False)
     r = np.linspace(0, max_r, num_radii)
 
     # Create meshgrid for polar coordinates
@@ -119,7 +150,7 @@ def radial_wrap(transformed_img, img_size, center):
     X = center[1] + R * np.cos(Theta)
     Y = center[0] + R * np.sin(Theta)
 
-    # Round and convert to integer indices
+    # Nearest-neighbor assignment to Cartesian pixels.
     Xi = np.round(X).astype(int)
     Yi = np.round(Y).astype(int)
 
@@ -143,7 +174,7 @@ def radial_wrap(transformed_img, img_size, center):
     weight[weight == 0] = np.nan
     img = img / weight
 
-    # Interpolate missing values within the valid circle
+    # Fill missing values using nearest-neighbor interpolation.
     XX, YY = np.meshgrid(np.arange(img_size[1]), np.arange(img_size[0]))
     dist_from_center = np.sqrt((XX - center[1]) ** 2 + (YY - center[0]) ** 2)
     circle_mask = dist_from_center <= max_r

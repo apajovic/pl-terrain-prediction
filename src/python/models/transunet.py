@@ -645,6 +645,8 @@ class DecoderBlock(nn.Module):
     def forward(self, x, skip=None):
         x = self.up(x)
         if skip is not None:
+            if skip.shape[2:] != x.shape[2:]:
+                skip = F.interpolate(skip, size=x.shape[2:], mode='bilinear', align_corners=False)
             x = torch.cat([x, skip], dim=1)
         x = self.conv1(x)
         x = self.conv2(x)
@@ -763,10 +765,12 @@ class VisionTransformer(nn.Module):
     def forward(self, x):
         if x.size()[1] == 1:
             x = x.repeat(1,3,1,1)
+        input_size = x.shape[2:]
         x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden)
         x = self.decoder(x, features)
-        # return x
         logits = self.segmentation_head(x)
+        if logits.shape[2:] != input_size:
+            logits = F.interpolate(logits, size=input_size, mode='bilinear', align_corners=False)
         return logits
 
     def load_from(self, weights):
